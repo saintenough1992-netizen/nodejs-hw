@@ -1,0 +1,202 @@
+[
+  {
+    "title": "Buy groceries",
+    "content": "Milk, eggs, bread, coffee",
+    "tag": "Shopping"
+  },
+  {
+    "title": "Weekly meeting notes",
+    "content": "Discussed Q3 goals and deadlines",
+    "tag": "Meeting"
+  },
+  {
+    "title": "Vacation ideas",
+    "content": "Thailand, Spain, Iceland",
+    "tag": "Travel"
+  },
+  {
+    "title": "Gym workout plan",
+    "content": "Monday: Chest, Tuesday: Back, Wednesday: Legs",
+    "tag": "Health"
+  },
+  {
+    "title": "Project roadmap",
+    "content": "Define MVP and next sprints",
+    "tag": "Work"
+  },
+  {
+    "title": "Personal budget 2025",
+    "content": "Track expenses, plan savings",
+    "tag": "Finance"
+  },
+  {
+    "title": "Birthday gift ideas",
+    "content": "Books, tech gadgets, gift cards",
+    "tag": "Personal"
+  },
+  {
+    "title": "Read next",
+    "content": "Clean Code, Pragmatic Programmer",
+    "tag": "Ideas"
+  },
+  {
+    "title": "Doctor appointment",
+    "content": "Dentist on Monday at 15:00",
+    "tag": "Health"
+  },
+  {
+    "title": "Shopping list",
+    "content": "New shoes, jeans, jacket",
+    "tag": "Shopping"
+  },
+  {
+    "title": "Client feedback summary",
+    "content": "Positive on design, negative on speed",
+    "tag": "Work"
+  },
+  {
+    "title": "Weekend plans",
+    "content": "Visit parents, go hiking",
+    "tag": "Personal"
+  },
+  {
+    "title": "Important deadlines",
+    "content": "Tax declaration by 15th of month",
+    "tag": "Important"
+  },
+  {
+    "title": "Ideas for blog",
+    "content": "Node.js patterns, testing strategies",
+    "tag": "Ideas"
+  },
+  {
+    "title": "Team building event",
+    "content": "Paintball on Saturday",
+    "tag": "Meeting"
+  },
+  {
+    "title": "Car maintenance",
+    "content": "Oil change next month",
+    "tag": "Personal"
+  },
+  {
+    "title": "New app features",
+    "content": "Dark mode, offline support",
+    "tag": "Work"
+  },
+  {
+    "title": "Travel checklist",
+    "content": "Passport, tickets, insurance",
+    "tag": "Travel"
+  },
+  {
+    "title": "Savings goals",
+    "content": "Save $200 per month",
+    "tag": "Finance"
+  },
+  {
+    "title": "Todo tasks",
+    "content": "Refactor notes controller, add tests",
+    "tag": "Todo"
+  },
+  {
+    "title": "Language learning plan",
+    "content": "Practice Spanish 3 times a week",
+    "tag": "Personal"
+  },
+  {
+    "title": "Conference summary",
+    "content": "Great networking, new React features",
+    "tag": "Work"
+  },
+  {
+    "title": "Pet care schedule",
+    "content": "Dog vaccine due next month",
+    "tag": "Health"
+  },
+  {
+    "title": "Grocery deals",
+    "content": "Discount on apples and chicken",
+    "tag": "Shopping"
+  },
+  {
+    "title": "Book summary",
+    "content": "Key takeaways from Atomic Habits",
+    "tag": "Ideas"
+  },
+  {
+    "title": "Important contacts",
+    "content": "Lawyer, doctor, insurance agent",
+    "tag": "Important"
+  },
+  {
+    "title": "Side project ideas",
+    "content": "Note app, budget tracker",
+    "tag": "Ideas"
+  },
+  {
+    "title": "Meditation routine",
+    "content": "10 minutes every morning",
+    "tag": "Health"
+  },
+  {
+    "title": "Annual goals",
+    "content": "Finish backend course, start blog",
+    "tag": "Personal"
+  },
+  {
+    "title": "Team OKRs",
+    "content": "Improve customer retention by 10%",
+    "tag": "Work"
+  },
+  {
+    "title": "Grocery budget",
+    "content": "Keep under $300 monthly",
+    "tag": "Finance"
+  },
+  {
+    "title": "Household chores",
+    "content": "Clean kitchen, fix leaky faucet",
+    "tag": "Todo"
+  },
+  {
+    "title": "Workshop notes",
+    "content": "Node.js performance tips",
+    "tag": "Meeting"
+  },
+  {
+    "title": "Travel destinations",
+    "content": "Japan, Portugal, Canada",
+    "tag": "Travel"
+  },
+  {
+    "title": "Recipe ideas",
+    "content": "Homemade pizza, avocado toast",
+    "tag": "Personal"
+  },
+  {
+    "title": "Weekly review",
+    "content": "What went well, what to improve",
+    "tag": "Work"
+  },
+  {
+    "title": "Future investments",
+    "content": "ETF research, gold savings",
+    "tag": "Finance"
+  },
+  {
+    "title": "Emergency numbers",
+    "content": "112, 101, 103",
+    "tag": "Important"
+  },
+  {
+    "title": "Skill improvement",
+    "content": "Learn TypeScript basics",
+    "tag": "Ideas"
+  },
+  {
+    "title": "Daily routine",
+    "content": "Wake up 7 AM, read 30 minutes",
+    "tag": "Personal"
+  }
+]
