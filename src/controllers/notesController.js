@@ -1,10 +1,39 @@
 import createHttpError from 'http-errors';
 import { Note } from '../models/note.js';
 
-export const getAllNotes = async (_req, res) => {
-  const notes = await Note.find();
+export const getAllNotes = async (req, res) => {
+  const { page, perPage, tag, search } = req.query;
+  const filter = {};
 
-  res.status(200).json(notes);
+  if (tag) {
+    filter.tag = tag;
+  }
+
+  if (search) {
+    // Шукаємо введений текст буквально, зокрема символи на кшталт + чи [.
+    const searchPattern = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    filter.$or = [
+      { title: { $regex: searchPattern, $options: 'i' } },
+      { content: { $regex: searchPattern, $options: 'i' } },
+    ];
+  }
+
+  const [notes, totalNotes] = await Promise.all([
+    Note.find(filter)
+      .sort({ _id: 1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage),
+    Note.countDocuments(filter),
+  ]);
+
+  res.status(200).json({
+    page,
+    perPage,
+    totalNotes,
+    totalPages: Math.ceil(totalNotes / perPage),
+    notes,
+  });
 };
 
 export const getNoteById = async (req, res) => {
