@@ -3,7 +3,7 @@ import { Note } from '../models/note.js';
 
 export const getAllNotes = async (req, res) => {
   const { page, perPage, tag, search } = req.query;
-  const filter = {};
+  const filter = { userId: req.user._id };
 
   if (tag) {
     filter.tag = tag;
@@ -37,7 +37,10 @@ export const getAllNotes = async (req, res) => {
 };
 
 export const getNoteById = async (req, res) => {
-  const note = await Note.findById(req.params.noteId);
+  const note = await Note.findOne({
+    _id: req.params.noteId,
+    userId: req.user._id,
+  });
 
   if (!note) {
     throw createHttpError(404, 'Note not found');
@@ -48,7 +51,7 @@ export const getNoteById = async (req, res) => {
 
 export const createNote = async (req, res) => {
   const { title, content, tag } = req.body ?? {};
-  const note = await Note.create({ title, content, tag });
+  const note = await Note.create({ title, content, tag, userId: req.user._id });
 
   res.status(201).json(note);
 };
@@ -63,8 +66,8 @@ export const updateNote = async (req, res) => {
     }
   }
 
-  const note = await Note.findByIdAndUpdate(
-    req.params.noteId,
+  const note = await Note.findOneAndUpdate(
+    { _id: req.params.noteId, userId: req.user._id },
     { $set: updates },
     { returnDocument: 'after', runValidators: true },
   );
@@ -77,7 +80,10 @@ export const updateNote = async (req, res) => {
 };
 
 export const deleteNote = async (req, res) => {
-  const note = await Note.findByIdAndDelete(req.params.noteId);
+  const note = await Note.findOneAndDelete({
+    _id: req.params.noteId,
+    userId: req.user._id,
+  });
 
   if (!note) {
     throw createHttpError(404, 'Note not found');
