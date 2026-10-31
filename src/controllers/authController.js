@@ -151,6 +151,7 @@ export const requestResetEmail = async (req, res) => {
     });
 
     await sendEmail({
+      from: process.env.SMTP_FROM,
       to: user.email,
       subject: 'NoteHub — скидання пароля',
       html,
