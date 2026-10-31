@@ -1,8 +1,9 @@
 # nodejs-hw — Notes API
 
 Навчальний Express-додаток із MongoDB та Mongoose: реєстрація, вхід,
-сесії в cookies, особисті нотатки, фільтрація, пошук, пагінація та валідація
-через celebrate. Локальний каталог — `notes-api`; файли призначені для
+сесії в cookies, скидання пароля через Brevo, аватари у Cloudinary, особисті
+нотатки, фільтрація, пошук, пагінація та валідація через celebrate.
+Локальний каталог — `notes-api`; файли призначені для
 репозиторію `nodejs-hw`.
 
 ## Запуск
@@ -25,18 +26,45 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-Заповніть `.env`, зберігаючи назви `PORT` і `MONGO_URL`:
+Заповніть `.env`, зберігаючи назви змінних. Нижче лише приклади й заповнювачі:
 
 ```dotenv
 PORT=3000
 MONGO_URL=mongodb+srv://USERNAME:PASSWORD@YOUR_CLUSTER.mongodb.net/nodejs-hw
+JWT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
+FRONTEND_DOMAIN=http://localhost:3000
+CLOUDINARY_CLOUD_NAME=YOUR_CLOUD_NAME
+CLOUDINARY_API_KEY=YOUR_NUMERIC_API_KEY
+CLOUDINARY_API_SECRET=YOUR_API_SECRET
+SMTP_PORT=587
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_USER=YOUR_BREVO_SMTP_LOGIN
+SMTP_PASSWORD=YOUR_BREVO_SMTP_KEY
+SMTP_FROM=YOUR_VERIFIED_SENDER_EMAIL
+
+# Необов’язкове: origin окремого клієнтського застосунку
 CLIENT_ORIGIN=http://localhost:3000
 ```
 
 Використайте власний рядок підключення MongoDB Atlas. Користувач MongoDB
 має мати доступ до бази `nodejs-hw`, а IP середовища запуску — бути дозволеним
-у Network Access. `CLIENT_ORIGIN` — необов’язкова змінна для CORS;
-за замовчуванням `http://localhost:3000`. Вкажіть точний origin фронтенду:
+у Network Access. Значення Brevo беруться з SMTP-налаштувань акаунта;
+`SMTP_PASSWORD` — SMTP-ключ, а `SMTP_FROM` — підтверджений відправник.
+Для порту 587 Nodemailer використовує STARTTLS; для 465 — TLS від початку
+з’єднання. Cloudinary потребує cloud name, числовий API key та API secret.
+Назва ключа у кабінеті не є значенням `CLOUDINARY_API_KEY`.
+
+Згенерувати випадковий `JWT_SECRET` можна командою й записати результат у `.env`:
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
+```
+
+`FRONTEND_DOMAIN` — адреса цього застосунку без шляху: локально, наприклад,
+`http://localhost:3000`; після розгортання — HTTPS-origin сервісу.
+Якщо змінюється `PORT`, відповідно змініть локальний `FRONTEND_DOMAIN`.
+`CLIENT_ORIGIN` необов’язковий: CORS використовує його, інакше —
+`FRONTEND_DOMAIN`, інакше — `http://localhost:3000`. Вказуйте точний origin:
 схема, домен і порт, без шляху та кінцевого `/`.
 
 Локальний `.env` уже налаштований. Його виключено з Git і ZIP-архіву;
@@ -58,6 +86,94 @@ npm run dev
 ```
 
 Без `MONGO_URL` або при невдалому підключенні процес завершується з кодом 1.
+
+## Скидання пароля та готова сторінка
+
+Сторінка вже входить у цей Express-додаток. Відкрийте
+`http://localhost:3000/reset-password` після запуску: без токена вона показує
+форму запиту листа, а з `?token=...` — форму нового пароля й підтвердження.
+Окреме розгортання фронтенду не потрібне. Сторінка викликає API на тому самому
+origin, показує помилки, прострочення та результат операції. JWT зберігається
+лише в пам’яті сторінки й прибирається з адресного рядка; після перезавантаження
+сторінки відкрийте посилання з листа знову.
+
+Обидва API-маршрути публічні та приймають JSON із заголовком
+`Content-Type: application/json`:
+
+| Запит                            | JSON-тіло                                                            | Успішна відповідь                                              |
+| -------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `POST /auth/request-reset-email` | `{ "email": "student@example.com" }`                                 | 200, `{ "message": "Password reset email sent successfully" }` |
+| `POST /auth/reset-password`      | `{ "token": "JWT_FROM_EMAIL", "password": "NewExamplePassword123" }` | 200, `{ "message": "Password reset successfully" }`            |
+
+`requestResetEmailSchema` вимагає коректний email. Для невідомої адреси сервер
+повертає те саме повідомлення 200, але не надсилає листа. Для існуючого
+користувача генерується підписаний JWT із `sub` та `email`, строком дії
+**15 хвилин**. HTML-лист створюється Handlebars із шаблону
+`src/templates/reset-password-email.html`, а утиліта `sendEmail` у
+`src/utils/sendMail.js` надсилає його через Nodemailer. Посилання має вигляд
+`<FRONTEND_DOMAIN>/reset-password?token=<jwt-token>`.
+
+Для листа, який відкриватиметься з іншого пристрою, використайте публічний
+HTTPS-домен у `FRONTEND_DOMAIN`: `localhost` веде на пристрій одержувача.
+
+`resetPasswordSchema` відповідно до завдання вимагає непорожні рядки `token`
+та `password`. Браузерна форма додатково вимагає щонайменше 8 символів і збіг
+підтвердження, як при реєстрації. Контролер перевіряє підпис, строк дії та поля
+JWT, знаходить користувача одночасно за `sub` і `email`, хешує новий пароль
+через bcrypt та зберігає його. Після успіху попередні сесії цього користувача
+видаляються й cookies очищуються: потрібен повторний вхід.
+
+| Ситуація                             | Статус | Повідомлення                                        |
+| ------------------------------------ | ------ | --------------------------------------------------- |
+| Не вдалося надіслати лист            | 500    | `Failed to send the email, please try again later.` |
+| JWT невалідний або прострочений      | 401    | `Invalid or expired token`                          |
+| Користувача з даними JWT не знайдено | 404    | `User not found`                                    |
+| Тіло запиту не пройшло celebrate     | 400    | Стандартна відповідь валідації                      |
+
+## Аватар користувача
+
+`User.avatar` — необов’язковий рядок із початковим значенням
+`https://ac.goit.global/fullstack/react/default-avatar.jpg`.
+Хук `pre('save')` зберігає встановлення `username` з email під час створення.
+
+`PATCH /users/me/avatar` потребує обох cookies чинної сесії: `sessionId`
+і `accessToken`. Надішліть `multipart/form-data` з одним файлом у полі
+**`avatar`**. Middleware `upload` у `src/middleware/multer.js` використовує
+`memoryStorage`, приймає MIME-типи, які починаються з `image/`, та обмежує
+файл до **2 MiB (2 × 1024 × 1024 байтів)**. Авторизація відбувається перед
+обробкою файлу.
+
+У браузері можна використати `FormData`; `Content-Type` вручну не задавайте,
+щоб браузер додав правильний multipart boundary:
+
+```js
+const data = new FormData();
+data.append('avatar', fileInput.files[0]);
+
+const response = await fetch('https://YOUR_API_HOST/users/me/avatar', {
+  method: 'PATCH',
+  credentials: 'include',
+  body: data,
+});
+const result = await response.json();
+```
+
+`saveFileToCloudinary(buffer, userId)` завантажує буфер через
+`cloudinary.uploader.upload_stream`; зображення користувача зберігається
+як `avatars/<userId>` із заміною попереднього. Контролер `updateUserAvatar`
+записує отриманий `secure_url` до поточного користувача й повертає:
+
+```json
+{ "url": "https://res.cloudinary.com/YOUR_CLOUD_NAME/image/upload/EXAMPLE" }
+```
+
+| Ситуація                           | Статус | Повідомлення                              |
+| ---------------------------------- | ------ | ----------------------------------------- |
+| Аватар оновлено                    | 200    | Об’єкт із полем `url`                     |
+| Файлу немає                        | 400    | `No file`                                 |
+| MIME-тип не починається з `image/` | 400    | `Only images allowed`                     |
+| Файл перевищує 2 MiB               | 413    | `File is too large. Maximum size is 2 MB` |
+| Сесія відсутня або невалідна       | 401    | Повідомлення middleware `authenticate`    |
 
 ## Авторизація
 
@@ -85,6 +201,8 @@ Email перевіряється, переводиться в нижній ре�
 Усі cookies мають `HttpOnly`, `Secure`, `SameSite=None` і `Path=/`.
 Вхід видаляє попередні сесії користувача. Refresh замінює стару сесію новою
 та оновлює всі cookies. Logout видаляє сесію та очищає cookies.
+Якщо refresh-токен прострочений, сервер видаляє його сесію та очищає всі
+три cookies перед відповіддю 401 `Session token expired`.
 Сервер також перевіряє строки дії токенів за датами в MongoDB.
 
 Для роботи з браузера використовуйте API через HTTPS, наприклад адресу
@@ -112,8 +230,10 @@ const notesResponse = await fetch(`${API_URL}/notes`, {
 ```
 
 Браузер зберігає й надсилає cookies самостійно; JavaScript не читає
-`HttpOnly` cookies. Middleware `authenticate` використовує `accessToken`
-із cookies та додає знайденого користувача до `req.user`.
+`HttpOnly` cookies. Middleware `authenticate` вимагає обидві cookies:
+`accessToken` і `sessionId`. Сесія шукається за `_id` та `accessToken` разом;
+відсутній, невалідний або чужий `sessionId` дає 401 `Session not found`.
+Після перевірки сесії знайдений користувач додається до `req.user`.
 
 ## Особисті нотатки
 
@@ -150,7 +270,8 @@ PATCH приймає хоча б одне з цих полів. Відсутні
 
 Теги у `src/constants/tags.js` спільні для моделі та валідації:
 `Work`, `Personal`, `Meeting`, `Shopping`, `Ideas`, `Travel`, `Finance`,
-`Health`, `Important`, `Todo`. Індекс задано через `noteSchema.index({ tag: 1 })`.
+`Health`, `Important`, `Todo`. Спільний індекс для тегу та власника задано через
+`noteSchema.index({ tag: 1, userId: 1 })`.
 Mongoose визначає колекцію `notes` для моделі `Note`; кастомна назва колекції
 до `model()` не передається.
 
@@ -219,7 +340,8 @@ Mongoose визначає колекцію `notes` для моделі `Note`; �
 інші повертають 500.
 
 `pino-http` логує HTTP-запити у JSON; заголовки `Cookie`, `Authorization`
-і `Set-Cookie` приховані в логах. `pino-pretty` збережено у `devDependencies`.
+і `Set-Cookie` приховані в логах. JWT у посиланнях також приховується;
+паролі та тіла запитів не логуються. `pino-pretty` збережено у `devDependencies`.
 `cookie-parser` читає cookies, `express.json()` обробляє JSON,
 а CORS дозволяє запити з `CLIENT_ORIGIN` із `credentials: true`.
 
@@ -234,19 +356,25 @@ Mongoose визначає колекцію `notes` для моделі `Note`; �
 ## Структура
 
 ```text
+public/
+├── reset-password.html
+├── reset-password.css
+└── reset-password.js
 src/
 ├── constants/
 │   ├── tags.js
 │   └── time.js
 ├── controllers/
 │   ├── authController.js
-│   └── notesController.js
+│   ├── notesController.js
+│   └── userController.js
 ├── db/
 │   └── connectMongoDB.js
 ├── middleware/
 │   ├── authenticate.js
 │   ├── errorHandler.js
 │   ├── logger.js
+│   ├── multer.js
 │   └── notFoundHandler.js
 ├── models/
 │   ├── note.js
@@ -254,9 +382,15 @@ src/
 │   └── user.js
 ├── routes/
 │   ├── authRoutes.js
-│   └── notesRoutes.js
+│   ├── notesRoutes.js
+│   └── userRoutes.js
 ├── services/
 │   └── auth.js
+├── templates/
+│   └── reset-password-email.html
+├── utils/
+│   ├── saveFileToCloudinary.js
+│   └── sendMail.js
 ├── validations/
 │   ├── authValidation.js
 │   └── notesValidation.js
@@ -275,21 +409,37 @@ npm run lint
 npm run format:check
 ```
 
-Перевірка з MongoDB Atlas охопила 88 HTTP-запитів і 402 перевірки тверджень:
-реєстрацію та хешування паролів, cookies, вхід, refresh/logout, прострочені
-та відсутні сесії, CRUD власних нотаток, ізоляцію двох користувачів,
-фільтрацію, пагінацію, валідацію, CORS і приховування cookies у логах.
-Також перевірено одночасні запити реєстрації та refresh. Три додаткові
-перевірки підтвердили очищення тимчасових даних: початкові нотатки,
-користувачі й сесії залишилися без змін; 40 навчальних записів збережено.
-HTTP-перевірки передавали заголовок `Cookie` вручну на localhost;
-повний сценарій браузера з HTTPS cookies окремо не перевірявся.
+Після додавання скидання пароля й аватара повторно пройдено 101 HTTP-запит із MongoDB Atlas:
+сесії, ізоляція користувачів, CRUD, пагінація, складений індекс
+`{ tag: 1, userId: 1 }`, відповідність `sessionId` та `accessToken`, очищення
+простроченого refresh. Початкові 40 нотаток залишено без змін.
+Окремо пройдено 41 HTTP-запит і 111 перевірок нових маршрутів: JWT та його
+строк дії, HTML-лист і посилання, помилки SMTP, зміну пароля та відкликання
+сесій, тип/розмір файлу, збереження аватара й помилки Cloudinary. У цих
+тестах MongoDB реальна, а SMTP та Cloudinary підмінені контрольованими
+відповідями, щоб перевірити успішні та помилкові сценарії без розсилки листів.
+Тимчасові користувачі та сесії видалені; початкові записи залишилися без змін.
+HTTP-тести передають cookies вручну на localhost. У браузері перевірено
+форму запиту листа, показ форми нового пароля й видалення токена з адресного
+рядка. Зміну пароля перевірено через HTTP API.
+
+Для нових зовнішніх інтеграцій підтверджено:
+
+- Brevo: реальне TLS-з’єднання та SMTP-автентифікацію. Лист до поштової
+  скриньки під час цієї перевірки не надсилався; доставку до Inbox не підтверджено.
+- Cloudinary: реальне завантаження тестового зображення та його видалення
+  після перевірки.
 
 Для Render використайте **Web Service** з **Language / Runtime: Node**,
 Build Command `npm ci` і Start Command `npm start`. Root Directory — папка,
 що містить `package.json` (порожнє значення, якщо він у корені репозиторію).
-Задайте `MONGO_URL` та `CLIENT_ORIGIN` у середовищі сервісу. Фронтенд має
-звертатися до HTTPS-адреси API з `credentials: 'include'`.
+Перенесіть усі потрібні значення з локального `.env` до Environment сервісу;
+сам файл у Git не додається. Render надає порт через `PORT`. У
+`FRONTEND_DOMAIN` задайте HTTPS-origin розгорнутого API, наприклад
+`https://YOUR_SERVICE.onrender.com`: цей самий сервіс віддає сторінку
+`/reset-password`, тож додатковий фронтенд не потрібний. Якщо використовується
+окремий клієнт, задайте його origin у `CLIENT_ORIGIN` і надсилайте cookies
+через `credentials: 'include'`.
 [Офіційна інструкція Render](https://render.com/docs/deploy-node-express-app).
 
 На цій машині локальний DNS `127.0.0.1` не обслуговував SRV-запити Atlas,

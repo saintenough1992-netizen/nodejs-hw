@@ -1,8 +1,12 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import Handlebars from 'handlebars';
+import { readFile } from 'node:fs/promises';
 import createHttpError from 'http-errors';
 import { isValidObjectId } from 'mongoose';
 import { User } from '../models/user.js';
 import { Session } from '../models/session.js';
+import { sendEmail } from '../utils/sendMail.js';
 import {
   createSession,
   setSessionCookies,
@@ -106,4 +110,100 @@ export const logoutUser = async (req, res) => {
   res.clearCookie('refreshToken', SESSION_COOKIE_OPTIONS);
 
   res.status(204).end();
+};
+
+export const requestResetEmail = async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+  const message = 'Password reset email sent successfully';
+
+  // Однакова відповідь не розкриває, чи зареєстрований email.
+  if (!user) {
+    return res.status(200).json({ message });
+  }
+
+  try {
+    const { JWT_SECRET, FRONTEND_DOMAIN } = process.env;
+
+    if (!JWT_SECRET || !FRONTEND_DOMAIN) {
+      throw new Error('Password reset configuration is missing');
+    }
+
+    const token = jwt.sign(
+      { sub: user._id.toString(), email: user.email },
+      JWT_SECRET,
+      { expiresIn: '15m', algorithm: 'HS256' },
+    );
+    const resetUrl = new URL('/reset-password', FRONTEND_DOMAIN);
+
+    if (!['http:', 'https:'].includes(resetUrl.protocol)) {
+      throw new Error('FRONTEND_DOMAIN must be an HTTP or HTTPS address');
+    }
+
+    resetUrl.searchParams.set('token', token);
+    const template = await readFile(
+      new URL('../templates/reset-password-email.html', import.meta.url),
+      'utf8',
+    );
+    const html = Handlebars.compile(template)({
+      username: user.username || user.email,
+      resetLink: resetUrl.href,
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject: 'NoteHub — скидання пароля',
+      html,
+      text: `Вітаємо, ${user.username || user.email}! Щоб змінити пароль NoteHub, відкрийте ${resetUrl.href}. Посилання діє 15 хвилин. Якщо ви не надсилали цей запит, проігноруйте лист.`,
+    });
+  } catch {
+    throw createHttpError(
+      500,
+      'Failed to send the email, please try again later.',
+    );
+  }
+
+  res.status(200).json({ message });
+};
+
+export const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+  const { JWT_SECRET } = process.env;
+
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+
+  let payload;
+
+  try {
+    payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+
+    if (
+      typeof payload !== 'object' ||
+      typeof payload.sub !== 'string' ||
+      !isValidObjectId(payload.sub) ||
+      typeof payload.email !== 'string' ||
+      typeof payload.exp !== 'number'
+    ) {
+      throw new Error('Invalid reset token payload');
+    }
+  } catch {
+    throw createHttpError(401, 'Invalid or expired token');
+  }
+
+  const user = await User.findOne({ _id: payload.sub, email: payload.email });
+
+  if (!user) {
+    throw createHttpError(404, 'User not found');
+  }
+
+  user.password = await bcrypt.hash(password, 10);
+  await user.save();
+  await Session.deleteMany({ userId: user._id });
+  res.clearCookie('sessionId', SESSION_COOKIE_OPTIONS);
+  res.clearCookie('accessToken', SESSION_COOKIE_OPTIONS);
+  res.clearCookie('refreshToken', SESSION_COOKIE_OPTIONS);
+
+  res.status(200).json({ message: 'Password reset successfully' });
 };
